@@ -1,6 +1,6 @@
 /**
  * @name SharingPrivacyFilter
- * @version 1.0.0
+ * @version 1.0.1
  * @description Mask user's name and icon for safety sharing.
  * @author Vee Dee
  * @authorLink http://twitter.com/v__d__
