@@ -1,6 +1,6 @@
 /**
  * @name SharingPrivacyFilter
- * @version 1.0.0
+ * @version 1.0.1
  * @description Mask user's name and icon for safety sharing.
  * @author Vee Dee
  * @authorLink http://twitter.com/v__d__
@@ -77,7 +77,7 @@ module.exports = class SharingPrivacyFilter {
     }
 
     // Mask
-    const uid = imgNode.dataset.userId;
+    const uid = imgNode.dataset.original.split('https://cdn.discordapp.com/avatars/')[1].split('/')[0];
     if(this.userIds.indexOf(uid) === -1 && uid !== myselfId) this.userIds.push(uid);
 
     const displayName = uid === myselfId? 'Me' : this.userIds.indexOf(uid) + 1;
