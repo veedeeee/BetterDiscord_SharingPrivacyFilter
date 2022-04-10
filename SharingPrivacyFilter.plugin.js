@@ -1,6 +1,6 @@
 /**
  * @name SharingPrivacyFilter
- * @version 1.1.0
+ * @version 1.1.1
  * @description Mask user's name and icon for safety sharing.
  * @author Vee Dee
  * @authorLink http://twitter.com/v__d__
@@ -57,7 +57,6 @@ module.exports = class SharingPrivacyFilter {
     toolbar.insertBefore(this.button, toolbar.querySelector('[class^="search"]'));
 
     this.button.addEventListener('click', evt => {
-      this.button.dataset.isMasked = this.button.dataset.isMasked === 'masked'? 'none' : 'masked';
       document.querySelectorAll(`li[id^='chat-messages']`).forEach(li => {
         if(li.querySelectorAll(`img[class*='avatar']`).length === 0) return;
         this.toggleMaskNodes(
@@ -72,14 +71,15 @@ module.exports = class SharingPrivacyFilter {
           div.querySelector(`[class*='username']`)
         );
       });
+      this.button.dataset.isMasked = this.button.dataset.isMasked === 'masked'? 'none' : 'masked';
     });
   }
 
   toggleMaskNodes(imgNode, nameNode) {
     const myselfId = document.body.dataset.currentUserId;
 
-    if(false === 'original' in  imgNode.dataset)  imgNode.dataset.original = imgNode.src;
-    if(false === 'original' in nameNode.dataset) nameNode.dataset.original = nameNode.textContent;
+    if('original' in  imgNode.dataset === false)  imgNode.dataset.original = imgNode.src;
+    if('original' in nameNode.dataset === false) nameNode.dataset.original = nameNode.textContent;
 
     // Unmask
     if(this.button.dataset.isMasked === 'masked') {
@@ -107,7 +107,7 @@ module.exports = class SharingPrivacyFilter {
 
       if(this.usersInfo[i].uid !== uid) continue;
       isNewEntry = false;
-      maskedName = i;
+      maskedName = i + 1;
       break;
     }
 
@@ -117,6 +117,7 @@ module.exports = class SharingPrivacyFilter {
         displayNameWithoutAtSign,
         avaterUrl
       ));
+      maskedName = this.usersInfo.length;
     }
 
     if(uid === myselfId) maskedName = 'Me';
