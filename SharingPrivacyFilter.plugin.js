@@ -14,10 +14,47 @@ class SPFUserInfo {
   }
 }
 
-/**
- * [exports description]
- * @para {[type]}
- */
+class SPFSetting {
+  constructor(storedData) {
+    this.maskType = (storedData && storedData.hasOwnProperty('maskType'))? storedData.maskType : 'Default';
+  }
+}
+
+const sortedCopyWithArray = array => {
+  let arr = array.slice(0, array.length);
+  for(let i = arr.length - 1; i>0; i--) {
+      let j = Math.floor(Math.random() * (i + 1));
+      let temp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = temp;
+  }
+
+  return arr;
+}
+
+const presidentsOfTheUSA = [
+  'George Washington', 'John Adams', 'Thomas Jefferson', 'James Madison', 'James Monroe',
+  'John Quincy Adams', 'Andrew Jackson', 'Martin Van Buren', 'William Henry Harrison', 'John Tyler',
+  'James K. Polk', 'Zachary Taylor', 'Millard Fillmore', 'Franklin Pierce', 'James Buchanan',
+  'Abraham Lincoln', 'Andrew Johnson', 'Ulysses S. Grant', 'Rutherford B. Hayes', 'James A. Garfield',
+  'Chester A. Arthur', 'Grover Cleveland', 'Benjamin Harrison', 'Grover Cleveland', 'William McKinley',
+  'Theodore Roosevelt', 'William Howard Taft', 'Woodrow Wilson', 'Warren G. Harding', 'Calvin Coolidge',
+  'Herbert Hoover', 'Franklin D. Roosevelt', 'Harry S. Truman', 'Dwight D. Eisenhower', 'John F. Kennedy',
+  'Lyndon B. Johnson', 'Richard Nixon', 'Gerald Ford', 'Jimmy Carter', 'Ronald Reagan',
+  'George H. W. Bush', 'Bill Clinton', 'George W. Bush', 'Barack Obama', 'Donald Trump',
+  'Joe Biden',
+];
+const jojo = [
+  'Jonathan Joestar', 'Speedwagon', 'Erina Pendleton', 'Will A. Zeppeli', 'Straizo',
+  'Joseph Joestar', 'Stroheim', 'Caesar A. Zeppeli', 'Lisa Lisa', 'Suzi Q',
+  'Jotaro Kujo', 'Mohammed Avdol', 'Noriaki Kakyoin', 'J. P. Polnareff', 'Iggy',
+  'Hermit Purple', 'Star Platinum', "Magician's Red", 'Hierophant Green', 'Silver Chariot', 'The Fool',
+  'Josuke Higashikata', 'Koichi Hirose', 'Okuyasu Nijimura', 'Rohan Kishibe', 'Shigechi',
+  'Crazy Diamond', 'Echoes', 'The Hand', "Heaven's Door", 'Harvest',
+  'Giorno Giovanna', 'Bruno Bucciarati', 'Leone Abbacchio', 'Guido Mista', 'Narancia Ghirga', 'Pannacotta Fugo',
+  'Gold Experience', 'Sticky Fingers', 'Moody Blues', 'Sex Pistols', 'Aerosmith', 'Purple Haze'
+];
+
 module.exports = class SharingPrivacyFilter {
   constructor() {
     this.buttonId = 'SPFToggleButton';
@@ -35,8 +72,54 @@ module.exports = class SharingPrivacyFilter {
   load() { this.addButton(); }
   onSwitch() { this.addButton(); }
 
+  getSettingsPanel() {
+    const savedData = new SPFSetting(BdApi.loadData('SharingPrivacyFilter', 'settings'));
+
+    const options = document.createDocumentFragment();
+    const defaultOption = document.createElement('option');
+    defaultOption.textContent = 'Default';
+    defaultOption.value = 'Default';
+    if(savedData.maskType === 'Default') defaultOption.selected = 'selected';
+    options.append(defaultOption);
+    Object.keys(this.settings.maskType).forEach(k => {
+      const option = document.createElement('option');
+      option.textContent = k;
+      option.value = k;
+      if(savedData.maskType === k) option.selected = 'selected';
+      options.append(option);
+    });
+
+    const select = document.createElement('select');
+    select.addEventListener('change', evt => {
+      savedData.maskType = select.value;
+      BdApi.saveData('SharingPrivacyFilter', 'settings', savedData);
+    });
+    select.appendChild(options);
+
+    const labelText = document.createElement('span');
+    labelText.textContent = 'Mask Type';
+    labelText.style.flex = '1 0 auto';
+
+    const label = document.createElement('label');
+    label.style.display = 'flex';
+    label.style.color = 'var(--header-primary)';
+    label.appendChild(labelText);
+    label.appendChild(select);
+
+    const panel = document.createElement('section');
+    panel.appendChild(label);
+    return panel;
+  }
+
   addButton() {
     this.usersInfo /* : [SPFUserInfo] */ = [];
+    this.settings = {
+      maskType: {
+        'Presidents of the USA': sortedCopyWithArray(presidentsOfTheUSA),
+        'JoJo': sortedCopyWithArray(jojo)
+      }
+    };
+
     if(document.querySelectorAll(`#${this.buttonId}`).length > 0) return;
 
     const toolbar = document.querySelector('[class*="toolbar"]');
@@ -97,7 +180,7 @@ module.exports = class SharingPrivacyFilter {
 
     // Actual displayName should be stored in this.usersInfo even it is post by myself
     // because uid cannot be grabed from replying view if user is using default avater
-    let maskedName;
+    let storedIndex;
     let isNewEntry = true;
     for(let i=0; i<this.usersInfo.length; i++) {
       if(!uid) {
@@ -107,22 +190,30 @@ module.exports = class SharingPrivacyFilter {
 
       if(this.usersInfo[i].uid !== uid) continue;
       isNewEntry = false;
-      maskedName = i + 1;
+      storedIndex = i;
       break;
     }
 
-    if(isNewEntry) {
+    if(isNewEntry && uid !== myselfId) {
       this.usersInfo.push(new SPFUserInfo(
         uid,
         displayNameWithoutAtSign,
         avaterUrl
       ));
-      maskedName = this.usersInfo.length;
+      storedIndex = this.usersInfo.length - 1;
     }
 
-    if(uid === myselfId) maskedName = 'Me';
+    let maskedName = 'Me';
+    if(uid !== myselfId) {
+      maskedName = storedIndex + 1;
+      const savedData = new SPFSetting(BdApi.loadData('SharingPrivacyFilter', 'settings'));
+      if(this.settings.maskType.hasOwnProperty(savedData.maskType)) {
+        maskedName = this.settings.maskType[savedData.maskType][storedIndex];
+      }
+    }
     const imgSize = (new URL(imgNode.dataset.original)).searchParams.get('size') || 80;
-    imgNode.src = `https://via.placeholder.com/${imgSize}.webp?text=${maskedName}`;
+    const initials = `${maskedName}`.indexOf(' ') === -1? maskedName : maskedName.split(' ').map(str => str.substr(0, 1)).join('');
+    imgNode.src = `https://via.placeholder.com/${imgSize}.webp?text=${initials}`;
     nameNode.textContent = (doesNameNodeBeginWithAtSign? '@' : '') + maskedName;
   }
 
