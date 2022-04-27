@@ -14,9 +14,51 @@ class SPFUserInfo {
   }
 }
 
+/// Wrapper class for stored config data
 class SPFSetting {
   constructor(storedData) {
     this.maskType = (storedData && storedData.hasOwnProperty('maskType'))? storedData.maskType : 'Default';
+  }
+}
+
+const BUTTON_ID = 'SPFToggleButton';
+
+class SPFButton extends BdApi.React.Component {
+  /**
+   * @param {Object} props
+   * @param {Bool}   props.defaultMaskState - true is `now masked`, false is `now original`
+   */
+  constructor(props) {
+    super(props);
+    this.state = {
+      isMasked: props.defaultMaskState,
+    }
+  }
+
+  buttonDidClicked(evt) {
+    this.setState({isMasked: !this.state.isMasked});
+  }
+
+  render() {
+    return BdApi.React.createElement('div', {
+      className: 'iconWrapper-2awDjA clickable-ZD7xvu',
+      id: BUTTON_ID,
+      tabIndex: 0,
+      onClick: evt => {
+        this.buttonDidClicked(evt);
+        this.props.onClickCallback();
+      },
+    }, BdApi.React.createElement('svg', {
+      x: 0, y: 0, width: 24, height: 24,
+      viewBox: '0 0 24 24',
+      className: 'icon-2xnN2Y',
+      style: {
+        color: `var(--interactive-${this.state.isMasked? 'active' : 'normal'})`
+      },
+    }, BdApi.React.createElement('path', {
+      fill: 'currentColor',
+      d: 'M15.83 9.81C14.7 9.7 13.69 10.38 13.46 11.5C13.46 11.84 14.81 12.29 16.05 12.29C17.29 12.29 18.41 11.5 18.41 11.28C18.41 11.05 17.63 9.93 15.83 9.81M8.18 9.81C6.38 9.93 5.59 10.94 5.59 11.27C5.59 11.5 6.82 12.29 7.95 12.29S10.54 11.84 10.54 11.5C10.31 10.38 9.19 9.7 8.18 9.81M16.95 16C15.04 16 13.8 13.75 12 13.75S8.85 16 7.05 16C4.69 16 3 13.86 3 10.04C3 7.68 3.68 7 6.71 7S10.54 8.24 12 8.24 14.36 7 17.29 7 21 7.79 21 10.04C21 13.86 19.31 16 16.95 16Z',
+    })));
   }
 }
 
@@ -56,20 +98,18 @@ const jojo = [
 ];
 
 module.exports = class SharingPrivacyFilter {
-  constructor() {
-    this.buttonId = 'SPFToggleButton';
-    this.path = {
-      mask: 'M15.83 9.81C14.7 9.7 13.69 10.38 13.46 11.5C13.46 11.84 14.81 12.29 16.05 12.29C17.29 12.29 18.41 11.5 18.41 11.28C18.41 11.05 17.63 9.93 15.83 9.81M8.18 9.81C6.38 9.93 5.59 10.94 5.59 11.27C5.59 11.5 6.82 12.29 7.95 12.29S10.54 11.84 10.54 11.5C10.31 10.38 9.19 9.7 8.18 9.81M16.95 16C15.04 16 13.8 13.75 12 13.75S8.85 16 7.05 16C4.69 16 3 13.86 3 10.04C3 7.68 3.68 7 6.71 7S10.54 8.24 12 8.24 14.36 7 17.29 7 21 7.79 21 10.04C21 13.86 19.31 16 16.95 16Z',
-    };
-  }
+  #button;
+  #buttonStateIsMasked = false;
+
+  constructor() {}
 
   start() { this.addButton(); }
   end() {
-    if(!this.button) return;
-    document.querySelector('[class*="toolbar"]').removeChild(this.button);
+    if(!this.#button) return;
+    BdApi.Patcher.unpatchAll(BUTTON_ID);
+    document.querySelector('[class*="toolbar"]').removeChild(this.#button);
   }
 
-  load() { this.addButton(); }
   onSwitch() { this.addButton(); }
 
   getSettingsPanel() {
@@ -118,44 +158,35 @@ module.exports = class SharingPrivacyFilter {
         'Presidents of the USA': sortedCopyWithArray(presidentsOfTheUSA),
         'JoJo': sortedCopyWithArray(jojo)
       }
-    };
+    }
+    const headerBar = BdApi.findModule(m => m.default && m.default.displayName == "HeaderBar");
+    let toolbar = null;
+    BdApi.Patcher.after(BUTTON_ID, headerBar, 'default', (_, [props], ret) => {
+      toolbar = props.toolbar;
+      const children = props.toolbar.props.children[0];
+      if(children.find(m => (m && m.type && m.type === SPFButton))) return ret;
 
-    if(document.querySelectorAll(`#${this.buttonId}`).length > 0) return;
+      children.push(BdApi.React.createElement(SPFButton, {
+        defaultMaskState: this.#buttonStateIsMasked,
+        onClickCallback: () => {
+          this.#buttonStateIsMasked = !this.#buttonStateIsMasked;
+          this.onMaskedStateChanged();
+        }
+      }));
+      return ret;
+    });
+    if(this.#buttonStateIsMasked) this.onMaskedStateChanged();
+    if(toolbar) toolbar.forceUpdate();
+  }
 
-    const toolbar = document.querySelector('[class*="toolbar"]');
-    this.button = toolbar.firstChild.cloneNode(true);
-    const svg = this.button.firstChild;
-    if(svg.childNodes.length > 1) {
-      const path = svg.firstChild;
-      while(svg.firstChild) {
-        svg.removeChild(svg.firstChild);
-      }
-      svg.appendChild(path);
+  onMaskedStateChanged() {
+    // new state is unmasked
+    if(!this.#buttonStateIsMasked) {
+      BdApi.Patcher.unpatchAll(BUTTON_ID + 'Event');
+      return;
     }
 
-    this.button.id = this.buttonId;
-    this.button.setAttribute('aria-label', `Mask users' icon and name`);
-    this.button.querySelector('svg path').setAttribute('d', this.path.mask);
-    this.button.dataset.isMasked = 'none';
-    toolbar.insertBefore(this.button, toolbar.querySelector('[class^="search"]'));
 
-    this.button.addEventListener('click', evt => {
-      document.querySelectorAll(`li[id^='chat-messages']`).forEach(li => {
-        if(li.querySelectorAll(`img[class*='avatar']`).length === 0) return;
-        this.toggleMaskNodes(
-          li.querySelector(`img[class*='avatar']`),
-          li.querySelector(`[id^='message-username'] [class*='username']`)
-        );
-      });
-      document.querySelectorAll(`[class*='repliedMessage']`).forEach(div => {
-        if(div.querySelectorAll(`img[class*='replyAvatar']`).length === 0) return;
-        this.toggleMaskNodes(
-          div.querySelector(`img[class*='replyAvatar']`),
-          div.querySelector(`[class*='username']`)
-        );
-      });
-      this.button.dataset.isMasked = this.button.dataset.isMasked === 'masked'? 'none' : 'masked';
-    });
   }
 
   toggleMaskNodes(imgNode, nameNode) {
